@@ -1,0 +1,17 @@
+{
+  "pushover_token": "YOUR_PUSHOVER_API_TOKEN",
+  "pushover_user": "YOUR_PUSHOVER_USER_KEY",
+  "max_push_notifications_per_day": 2,
+  "data_folder": "data",
+  "drives": [
+    {
+      "path": "C:",
+      "minimum_disk_space": "10GB"
+    },
+    {
+      "path": "D:",
+      "minimum_disk_space": "5GB"
+    }
+  ]
+}
+

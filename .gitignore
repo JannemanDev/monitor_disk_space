@@ -1,0 +1,25 @@
+# Settings files with sensitive credentials (ignore all except example)
+settings*.json
+!settings.example.json
+
+# Data directory containing logs, graphs, and tracking files
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+# Virtual environments
+env/
+venv/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
