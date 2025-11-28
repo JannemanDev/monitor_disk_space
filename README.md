@@ -104,10 +104,16 @@ If this is your first time, you may be asked to choose an editor. Choose your pr
 
 ### Step 3: Add Cron Job Line
 
+> **Note:** The examples below assume you installed dependencies using a virtual environment (recommended). If you used a different installation method, adjust the Python path accordingly.
+
+**For virtual environment installations (recommended):**
+
 Add a line to your crontab. The format is:
 ```
-* * * * * /path/to/python /path/to/monitor_disk_space.py [--settings /path/to/settings.json]
+* * * * * /path/to/venv/bin/python3 /path/to/monitor_disk_space.py [--settings settings.json]
 ```
+
+**Important:** Use the Python interpreter from your virtual environment (`venv/bin/python3`) and absolute paths for the script. Relative paths won't work in cron.
 
 **Cron time format:**
 ```
@@ -124,30 +130,40 @@ Add a line to your crontab. The format is:
 
 Run every hour:
 ```bash
-0 * * * * /usr/bin/python3 /root/monitor_disk_space/monitor_disk_space.py
+0 * * * * /root/monitor_disk_space/venv/bin/python3 /root/monitor_disk_space/monitor_disk_space.py --settings settings.ubuntu.json
 ```
 
 Run daily at 9:00 AM:
 ```bash
-0 9 * * * /usr/bin/python3 /root/monitor_disk_space/monitor_disk_space.py
+0 9 * * * /root/monitor_disk_space/venv/bin/python3 /root/monitor_disk_space/monitor_disk_space.py --settings settings.ubuntu.json
 ```
 
 Run every 6 hours:
 ```bash
-0 */6 * * * /usr/bin/python3 /root/monitor_disk_space/monitor_disk_space.py
+0 */6 * * * /root/monitor_disk_space/venv/bin/python3 /root/monitor_disk_space/monitor_disk_space.py --settings settings.ubuntu.json
 ```
 
 Run daily at 2:30 AM:
 ```bash
-30 2 * * * /usr/bin/python3 /root/monitor_disk_space/monitor_disk_space.py
+30 2 * * * /root/monitor_disk_space/venv/bin/python3 /root/monitor_disk_space/monitor_disk_space.py --settings settings.ubuntu.json
 ```
 
 Run with custom settings file:
 ```bash
-0 * * * * /usr/bin/python3 /root/monitor_disk_space/monitor_disk_space.py --settings /root/monitor_disk_space/settings.ubuntu.json
+0 * * * * /root/monitor_disk_space/venv/bin/python3 /root/monitor_disk_space/monitor_disk_space.py --settings settings.ubuntu.json
 ```
 
-**Important:** Use absolute paths for both Python and the script. Relative paths won't work in cron.
+**Important:** 
+- Use the Python interpreter from your virtual environment (`venv/bin/python3`)
+- Use absolute paths for the script location
+- Settings file path is relative to the script's directory, or use an absolute path
+
+**For other installation methods:**
+
+If you installed packages using `pipx` or system packages, use the appropriate Python path:
+- **pipx**: Use `pipx run monitor_disk_space.py` or the pipx-managed Python path
+- **System packages**: Use `/usr/bin/python3` or wherever your system Python is located
+- **Custom installation**: Use the full path to your Python interpreter
 
 ### Step 4: Save and Exit
 
@@ -374,6 +390,6 @@ pip install --break-system-packages -r requirements.txt
 For cron jobs, make sure to use the full path to the Python interpreter in your virtual environment:
 ```bash
 # Example cron job using venv
-0 * * * * /path/to/monitor_disk_space/venv/bin/python /path/to/monitor_disk_space/monitor_disk_space.py
+0 * * * * /root/monitor_disk_space/venv/bin/python3 /root/monitor_disk_space/monitor_disk_space.py --settings settings.ubuntu.json
 ```
 
