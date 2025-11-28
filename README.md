@@ -215,7 +215,7 @@ The script will:
 
 - **pushover_token**: Your Pushover API token
 - **pushover_user**: Your Pushover user key
-- **max_push_notifications_per_day**: (Optional) Maximum number of push notifications to send per day. Prevents notification spam if disk space fluctuates around the threshold. If not specified, there is no limit. Default: unlimited
+- **max_push_notifications_per_day**: (Optional) Maximum number of push notifications to send per day **per drive**. Prevents notification spam if disk space fluctuates around the threshold. Each drive has its own independent limit. If not specified, there is no limit. Default: unlimited
 - **data_folder**: (Optional) Path to folder for storing logs, graphs, and tracking files. Can be relative (to settings file directory) or absolute. Default: `"data"`
 - **drives**: List of drive configurations. Each drive must specify:
   - **path**: Drive path (e.g., `"C:"` on Windows, `"/"` on Linux/Mac)
@@ -239,7 +239,7 @@ The script will:
   ```
 
 **Notes:**
-- The notification count resets daily at midnight. A tracking file (`.notification_tracking.json`) is created in the same directory as your settings file to track daily counts.
+- The notification count resets daily at midnight **per drive**. Each drive has its own independent notification limit. A tracking file (`.notification_tracking.json`) is created in the data folder to track daily counts per drive.
 - Log files are automatically created for each monitored drive (e.g., `C.log` for drive `C:`, `root.log` for `/`). Each line contains a timestamp, free space in bytes, and human-readable format (e.g., `2024-01-01T12:00:00 102176960512 (95 GB 201 MB)`). Log files are stored in the folder specified by `data_folder` (default: `data/`).
 - Graph files (PNG images) are automatically generated for each drive showing free disk space trends over time. Graphs require at least 2 log entries and are updated each time the script runs. Requires `matplotlib` to be installed. Graph files are stored in the folder specified by `data_folder` (default: `data/`).
 - All generated files (logs, graphs, and notification tracking) are stored in the folder specified by the `data_folder` setting. The folder path can be relative to the settings file directory or an absolute path. The folder is created automatically if it doesn't exist.

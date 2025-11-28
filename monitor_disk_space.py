@@ -11,6 +11,7 @@ import shutil
 import re
 import json
 import argparse
+import socket
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, Optional, List, Tuple
@@ -41,6 +42,12 @@ class DiskSpaceMonitor:
         self.max_push_notifications_per_day = config.get(
             "max_push_notifications_per_day"
         )
+
+        # Get hostname for notifications
+        try:
+            self.hostname = socket.gethostname()
+        except Exception:
+            self.hostname = "unknown"
 
         # Parse drives configuration
         drives_config = config.get("drives", [])
@@ -435,12 +442,15 @@ class DiskSpaceMonitor:
             print(f"Warning: Could not save graph {graph_file}: {e}")
             plt.close()
 
-    def _get_notification_count_today(self) -> int:
+    def _get_notification_count_today(self, drive_path: str) -> int:
         """
-        Get the number of notifications sent today.
+        Get the number of notifications sent today for a specific drive.
+
+        Args:
+            drive_path: Drive path (e.g., "C:", "/")
 
         Returns:
-            Number of notifications sent today
+            Number of notifications sent today for this drive
         """
         today = date.today().isoformat()
 
@@ -448,35 +458,59 @@ class DiskSpaceMonitor:
             return 0
 
         try:
+            if not self.tracking_file.exists():
+                return 0
+
+            # Check if file is empty
+            if self.tracking_file.stat().st_size == 0:
+                return 0
+
             with open(self.tracking_file, "r", encoding="utf-8") as f:
-                tracking_data = json.load(f)
+                content = f.read().strip()
+                if not content:
+                    return 0
+                tracking_data = json.loads(content)
 
             # Check if tracking data is for today
             if tracking_data.get("date") == today:
-                return tracking_data.get("count", 0)
+                drives = tracking_data.get("drives", {})
+                return drives.get(drive_path, 0)
             else:
                 # Different day, reset count
                 return 0
-        except (json.JSONDecodeError, KeyError):
+        except (json.JSONDecodeError, KeyError, ValueError):
             # Invalid or corrupted tracking file, reset
             return 0
 
-    def _increment_notification_count(self) -> None:
-        """Increment the notification count for today."""
+    def _increment_notification_count(self, drive_path: str) -> None:
+        """
+        Increment the notification count for today for a specific drive.
+
+        Args:
+            drive_path: Drive path (e.g., "C:", "/")
+        """
         today = date.today().isoformat()
 
         try:
-            if self.tracking_file.exists():
-                with open(self.tracking_file, "r", encoding="utf-8") as f:
-                    tracking_data = json.load(f)
-            else:
-                tracking_data = {}
+            tracking_data = {}
 
-            # Reset if it's a different day
-            if tracking_data.get("date") != today:
-                tracking_data = {"date": today, "count": 0}
+            if self.tracking_file.exists() and self.tracking_file.stat().st_size > 0:
+                try:
+                    with open(self.tracking_file, "r", encoding="utf-8") as f:
+                        content = f.read().strip()
+                        if content:
+                            tracking_data = json.loads(content)
+                except (json.JSONDecodeError, ValueError):
+                    # File is corrupted, start fresh
+                    tracking_data = {}
 
-            tracking_data["count"] = tracking_data.get("count", 0) + 1
+            # Reset if it's a different day or if data structure is invalid
+            if tracking_data.get("date") != today or "drives" not in tracking_data:
+                tracking_data = {"date": today, "drives": {}}
+
+            # Increment count for this drive
+            drives = tracking_data["drives"]
+            drives[drive_path] = drives.get(drive_path, 0) + 1
 
             with open(self.tracking_file, "w", encoding="utf-8") as f:
                 json.dump(tracking_data, f)
@@ -484,25 +518,26 @@ class DiskSpaceMonitor:
             print(f"Warning: Could not update notification tracking: {e}")
 
     def send_pushover_notification(
-        self, title: str, message: str, priority: int = 0
+        self, title: str, message: str, drive_path: str, priority: int = 0
     ) -> bool:
         """
-        Send notification via Pushover, respecting daily limit.
+        Send notification via Pushover, respecting daily limit per drive.
 
         Args:
             title: Notification title
             message: Notification message
+            drive_path: Drive path for tracking (e.g., "C:", "/")
             priority: Priority level (0=normal, 1=high, 2=emergency)
 
         Returns:
             True if successful, False if limit exceeded or error occurred
         """
-        # Check daily limit if configured
+        # Check daily limit if configured (per drive)
         if self.max_push_notifications_per_day is not None:
-            count_today = self._get_notification_count_today()
+            count_today = self._get_notification_count_today(drive_path)
             if count_today >= self.max_push_notifications_per_day:
                 print(
-                    f"⚠️  Notification limit reached ({count_today}/{self.max_push_notifications_per_day} today). Skipping notification."
+                    f"⚠️  Notification limit reached for {drive_path} ({count_today}/{self.max_push_notifications_per_day} today). Skipping notification."
                 )
                 return False
 
@@ -519,9 +554,9 @@ class DiskSpaceMonitor:
             response = requests.post(url, data=data, timeout=10)
             response.raise_for_status()
 
-            # Increment count only on success
+            # Increment count only on success (per drive)
             if self.max_push_notifications_per_day is not None:
-                self._increment_notification_count()
+                self._increment_notification_count(drive_path)
 
             return True
         except Exception as e:
@@ -557,8 +592,9 @@ class DiskSpaceMonitor:
             self._generate_graph(drive_path, log_file)
 
             if free_space < minimum_bytes:
-                title = f"⚠️ Low Disk Space Alert: {drive_path}"
+                title = f"⚠️ Low Disk Space Alert: {self.hostname} - {drive_path}"
                 message = (
+                    f"Host: {self.hostname}\n"
                     f"Drive {drive_path} is running low on disk space!\n\n"
                     f"Free space: {self.format_bytes(free_space)}\n"
                     f"Used space: {self.format_bytes(used_space)}\n"
@@ -568,7 +604,7 @@ class DiskSpaceMonitor:
                 )
 
                 print(f"⚠️  ALERT: {drive_path} below threshold!")
-                self.send_pushover_notification(title, message, priority=1)
+                self.send_pushover_notification(title, message, drive_path, priority=1)
 
     def run(self):
         """Run a single disk space check."""
