@@ -236,6 +236,7 @@ The script will:
 - **drives**: List of drive configurations. Each drive must specify:
   - **path**: Drive path (e.g., `"C:"` on Windows, `"/"` on Linux/Mac)
   - **minimum_disk_space**: Alert threshold in human-friendly format:
+  - **enabled**: (Optional) If `false`, the drive is not monitored. Default: `true`
     - `"500MB"` - 500 megabytes
     - `"10GB"` - 10 gigabytes
     - `"1TB"` - 1 terabyte
@@ -244,10 +245,12 @@ The script will:
   ```json
   "drives": [
     {
+      "enabled": true,
       "path": "C:",
       "minimum_disk_space": "10GB"
     },
     {
+      "enabled": true,
       "path": "D:",
       "minimum_disk_space": "5GB"
     }

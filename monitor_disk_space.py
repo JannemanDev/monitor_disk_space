@@ -35,6 +35,7 @@ class DiskSpaceMonitor:
                 - drives: List of drive configurations, each with:
                   * path: Drive path (e.g., "C:", "/")
                   * minimum_disk_space: Minimum disk space threshold (e.g., "10GB", "500MB")
+                  * enabled: (Optional) If false, the drive is skipped. Default: true
             settings_file_path: Path to settings file (used for tracking file location)
         """
         self.pushover_token = config.get("pushover_token")
@@ -83,12 +84,13 @@ class DiskSpaceMonitor:
         Parse drives configuration into a list of drive dictionaries.
 
         Each drive must be an object with 'path' and 'minimum_disk_space' fields.
+        Optional 'enabled' (default true): if false, the drive is not monitored.
 
         Args:
             drives_config: Drives configuration from settings
 
         Returns:
-            List of dictionaries with 'path' and 'minimum_bytes' keys
+            List of dictionaries with 'path' and 'minimum_bytes' keys (enabled drives only)
         """
         drives = []
 
@@ -98,6 +100,9 @@ class DiskSpaceMonitor:
                     f"Invalid drive configuration: {drive_config}. "
                     f"Each drive must be an object with 'path' and 'minimum_disk_space' fields."
                 )
+
+            if drive_config.get("enabled", True) is False:
+                continue
 
             path = drive_config.get("path")
             if not path:

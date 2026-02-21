@@ -5,10 +5,12 @@
   "data_folder": "data",
   "drives": [
     {
+      "enabled": true,
       "path": "C:",
       "minimum_disk_space": "10GB"
     },
     {
+      "enabled": true,
       "path": "D:",
       "minimum_disk_space": "5GB"
     }
