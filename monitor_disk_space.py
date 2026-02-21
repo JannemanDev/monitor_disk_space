@@ -263,7 +263,8 @@ class DiskSpaceMonitor:
 
         try:
             with open(log_file, "a", encoding="utf-8") as f:
-                f.write(f"{timestamp} {free_space} ({human_readable})\n")
+                # Right-align raw byte count (2nd column); human-readable stays left
+                f.write(f"{timestamp} {free_space:>15} ({human_readable})\n")
         except Exception as e:
             print(f"Warning: Could not write to log file {log_file}: {e}")
 
