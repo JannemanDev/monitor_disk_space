@@ -226,6 +226,20 @@ class DiskSpaceMonitor:
 
         return " ".join(parts) if parts else "0 B"
 
+    def _format_bytes_log_line(self, bytes: int) -> str:
+        """
+        Format bytes for log line: always "X TB Y GB Z MB W KB" with right-aligned
+        numbers (width 4) so lines align (e.g. "   0 TB    0 GB 182 MB  660 KB").
+        """
+        tb = bytes // (1024**4)
+        remainder = bytes % (1024**4)
+        gb = remainder // (1024**3)
+        remainder = remainder % (1024**3)
+        mb = remainder // (1024**2)
+        remainder = remainder % (1024**2)
+        kb = remainder // 1024
+        return f"{tb:>4} TB {gb:>4} GB {mb:>4} MB {kb:>4} KB"
+
     def _get_log_filename(self, drive_path: str) -> Path:
         """
         Get a safe log filename for a drive path.
@@ -258,12 +272,12 @@ class DiskSpaceMonitor:
             free_space: Free space in bytes
         """
         log_file = self._get_log_filename(drive_path)
-        human_readable = self.format_bytes_multiple_units(free_space)
+        human_readable = self._format_bytes_log_line(free_space)
         timestamp = datetime.now().isoformat()
 
         try:
             with open(log_file, "a", encoding="utf-8") as f:
-                # Right-align raw byte count (2nd column); human-readable stays left
+                # Right-align raw byte count and human-readable TB/GB/MB/KB
                 f.write(f"{timestamp} {free_space:>15} ({human_readable})\n")
         except Exception as e:
             print(f"Warning: Could not write to log file {log_file}: {e}")
@@ -320,22 +334,23 @@ class DiskSpaceMonitor:
 
                 # Try to parse new format: ISO timestamp bytes (human_readable)
                 # Format: "2024-01-01T12:00:00.123456 102176960512 (95 GB 201 MB)"
+                # Or with right-aligned bytes: "2024-...     102176960512 (  0 TB ...)"
                 # Or old format: "102176960512" or "102176960512 (95 GB 201 MB)"
-                parts = line.split(" ", 2)
+                parts = line.split()
 
                 if len(parts) >= 2:
-                    timestamp_str = parts[0]
-                    bytes_str = parts[1]
+                    first = parts[0]
+                    second = parts[1]
 
                     # Check if first part is an ISO timestamp
-                    if "T" in timestamp_str or (
-                        len(timestamp_str) >= 10
-                        and timestamp_str[4] == "-"
-                        and timestamp_str[7] == "-"
+                    if "T" in first or (
+                        len(first) >= 10
+                        and first[4] == "-"
+                        and first[7] == "-"
                     ):
                         try:
-                            timestamp = datetime.fromisoformat(timestamp_str)
-                            free_space = int(bytes_str)
+                            timestamp = datetime.fromisoformat(first)
+                            free_space = int(second)
                             data_points.append((timestamp, free_space))
                             continue
                         except ValueError:
@@ -343,7 +358,7 @@ class DiskSpaceMonitor:
 
                     # Old format: "bytes" or "bytes (human_readable)"
                     try:
-                        free_space = int(parts[0])
+                        free_space = int(first)
                         # Assign estimated timestamps going backwards from now
                         # Assume 1 hour intervals between old entries
                         estimated_time = datetime.now() - timedelta(
@@ -385,6 +400,7 @@ class DiskSpaceMonitor:
             matplotlib.use("Agg")  # Use non-interactive backend
             import matplotlib.pyplot as plt
             import matplotlib.dates as mdates
+            from matplotlib.ticker import MaxNLocator
         except ImportError:
             print(
                 f"Warning: matplotlib not installed. Skipping graph generation for {drive_path}."
@@ -407,7 +423,7 @@ class DiskSpaceMonitor:
         free_spaces_gb = [space / (1024**3) for space in free_spaces]
 
         # Create the graph
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(14, 16))
         ax.plot(
             timestamps,
             free_spaces_gb,
@@ -424,12 +440,37 @@ class DiskSpaceMonitor:
         )
         ax.grid(True, alpha=0.3)
 
-        # Format x-axis dates
+        # Y-axis: include 0.0 GB at bottom so zero spikes are visible
+        ax.set_ylim(bottom=0)
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=20))
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"{x:.1f} GB"))
+
+        # Red horizontal line at minimum_disk_space threshold
+        for drive_config in self.drives:
+            if drive_config["path"] == drive_path:
+                minimum_gb = drive_config["minimum_bytes"] / (1024**3)
+                ax.axhline(
+                    y=minimum_gb,
+                    color="red",
+                    linestyle="-",
+                    linewidth=2,
+                    label=f"Minimum ({minimum_gb:.1f} GB)",
+                )
+                # Ensure y-axis top includes the threshold so the line is visible
+                _, ymax = ax.get_ylim()
+                if minimum_gb > ymax:
+                    ax.set_ylim(top=minimum_gb * 1.1)
+                ax.legend(loc="upper right")
+                break
+
+        # Add top margin so max value is not flush with the top of the y-axis
+        _, ytop = ax.get_ylim()
+        ax.set_ylim(top=ytop * 1.05)
+
+        # X-axis: more date ticks
+        ax.xaxis.set_major_locator(mdates.AutoDateLocator(maxticks=25))
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d %H:%M"))
         plt.xticks(rotation=45, ha="right")
-
-        # Format y-axis to show GB
-        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"{x:.1f} GB"))
 
         plt.tight_layout()
 
